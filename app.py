@@ -49,21 +49,31 @@ def query_agent(agent, query):
             For the following query, if it requires drawing, plotting, visualization some data, 
             generate python code and format code as follows
             ```python
-            code, ...
-            ``` 
+            import matplotlib as plt
+            ...
+            ```
+            Example:
+            ```python
+            import matplotlib.pyplot as plt
+            plt.hist(df['Age'])
+            plt.title('Age Range of All Passengers')
+            plt.xlabel('Age')
+            plt.ylabel('Count')
+            plt.show()
+            ```
 
             If it is just asking a question that requires neither, reply as follows:
             {"answer": "answer"}
             Example:
             {"answer": "The title with the highest rating is 'Gilead'"}
-
+            
             If you do not know the answer, reply as follows:
             {"answer": "I do not know."}
-
+            
             Return all output as a string.
-
+            
             Lets think step by step.
-
+            
             Below is the query.
             Query: 
             """
@@ -76,8 +86,7 @@ def query_agent(agent, query):
     # Convert the response to a string.
     return response.__str__()
 
-def csv_agent_func2(file_path, query):
-    """Run the CSV agent with the given file path and user message."""
+def init_agent(file_path):
     model = AzureChatOpenAI(
         temperature=0,
         openai_api_base=os.environ['OPENAI_API_BASE'],
@@ -93,7 +102,10 @@ def csv_agent_func2(file_path, query):
         verbose=True,
         agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION
     )
+    return agent
 
+def csv_agent_func2(agent, query):
+    """Run the CSV agent with the given file path and user message."""
     try:
         # response = agent.run(tool_input)
         response = query_agent(agent, query)
@@ -165,7 +177,10 @@ def display_content_from_json(json_response):
 
 def extract_code_from_response(response):
     """Extracts Python code from a string response."""
-    # Use a regex pattern to match content between triple backticks
+    # Use a regex pattern to match content between triple backticks    
+    # if "code" not in response:
+        # return None
+
     code_pattern = r"```python(.*?)```"
     match = re.search(code_pattern, response, re.DOTALL)
     
@@ -176,27 +191,49 @@ def extract_code_from_response(response):
 
 def csv_analyzer_app():
     """Main Streamlit application for CSV analysis."""
-    st.title('CSV Assistant')
-    st.write('Please upload your CSV file and enter your query below:')
+    st.title('HSBC HW: CSV analyzer')
     
-    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+    option = st.selectbox(
+        "How would you like to start?",
+        ("Upload your own data", "Use default Titanic data"),
+        index=None,
+        placeholder="Select one option...",
+    )
+    st.write('You selected:', option)
     
-    if uploaded_file is not None:
+    # st.info("If no file is uploaded, this app will use the default data: titanic.csv!")
+    file_path = None
+    if option == "Upload your own data":
+        st.write('Please upload your CSV file and enter your query below:')
+        uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+
         file_details = {"FileName": uploaded_file.name, "FileType": uploaded_file.type, "FileSize": uploaded_file.size}
         st.write(file_details)
-        
+
         # Save the uploaded file to disk
         file_path = os.path.join("/tmp", uploaded_file.name)
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
-        
+
+
+
+    elif option == "Use default Titanic data":
+        file_path = './data/titanic.csv'
+
+    if file_path is not None:
+        st.info("csv file is: {}".format(file_path))
+    else:
+        st.error("You have to select one option!")
+    
+    if file_path is not None:
         df = pd.read_csv(file_path)
+        st.write("Preview: ")
         st.dataframe(df[:10])
-        
+
+        agent = init_agent(file_path)
         user_input = st.text_input("Your query")
         if st.button('Run'):
-            response = csv_agent_func2(file_path, user_input)
-
+            response = csv_agent_func2(agent, user_input)
             print("--------********")
             print(response)
             print("********--------")
@@ -215,67 +252,9 @@ def csv_analyzer_app():
             else:
                 st.write(response)
 
+    # if uploaded_file is not None:
     st.divider()
 
-
-
-# st.title('CSV Question and answer ChatBot')
-# st.info("If no file is uploaded, this app will use the default data: titanic.csv!")
-# csv_file_uploaded = st.file_uploader(label="Upload your CSV File here")
-
-# question = st.text_input("Enter your query:")
-
-# data_folder = './data'
-
-# if csv_file_uploaded is not None:
-#     def save_file_to_folder(uploadedFile):
-#         # Save uploaded file to 'content' folder.
-#         save_folder = data_folder
-#         save_path = Path(save_folder, uploadedFile.name)
-#         with open(save_path, mode='wb') as w:
-#             w.write(uploadedFile.getvalue())
-
-#         if save_path.exists():
-#             st.success(f'File {uploadedFile.name} is successfully saved!')
-            
-#     save_file_to_folder(csv_file_uploaded)
-#     # loader = CSVLoader(file_path=os.path.join(data_folder, csv_file_uploaded.name))
-#     document = pd.read_csv(os.path.join(data_folder, csv_file_uploaded.name))#,encoding='ISO-8859-1')
-# else:
-#     # Load the documents
-#     # loader = CSVLoader(file_path='./data/2021-2022 Football Player Stats.csv',encoding = 'ISO-8859-1')
-#     document = pd.read_csv(os.path.join(data_folder, 'titanic.csv'))
-
-# from langchain.chat_models import AzureChatOpenAI
-# from langchain.agents import create_csv_agent
-# model = AzureChatOpenAI(
-#     temperature=0,
-#     openai_api_base=os.environ['OPENAI_API_BASE'],
-#     openai_api_version=os.environ['OPENAI_API_VERSION'],
-#     deployment_name=os.environ['DEPLOYMENT_NAME'],
-#     openai_api_key=os.environ['OPENAI_API_KEY'],
-#     openai_api_type=os.environ['OPENAI_API_TYPE'],
-# )
-
-# agent = create_csv_agent(
-#     model,
-#     os.path.join(data_folder, 'titanic.csv'), 
-#     verbose=True)
-
-# if st.button("Submit"):
-#     result = agent(question)
-#     st.write(result["result"])
-# else:
-#     st.error("Please upload a document and enter a query!")
-
-# tool_input = {
-#             "input": {
-#                 "name": "python",
-#                 "arguments": 'visualize the age range of passengers.'
-#             }
-#         }
-        
-# response = agent.run(tool_input)
 
 if __name__ == '__main__':
     csv_analyzer_app()
