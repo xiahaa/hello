@@ -3,3 +3,11 @@ numpy
 pandas
 pydeck
 streamlit
+
+chromadb==0.3.29
+openai
+langchain
+python-dotenv
+tiktoken
+# streamlit
+streamlit-chat
