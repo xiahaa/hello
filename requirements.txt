@@ -11,3 +11,9 @@ python-dotenv
 tiktoken
 # streamlit
 streamlit-chat
+seaborn
+tabulate
+numpy
+matplotlib
+scikit-learn
+scipy
